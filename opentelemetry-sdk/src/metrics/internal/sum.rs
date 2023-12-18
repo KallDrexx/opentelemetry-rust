@@ -12,19 +12,21 @@ use opentelemetry::{global, metrics::MetricsError};
 
 use super::{
     aggregate::{is_under_cardinality_limit, STREAM_OVERFLOW_ATTRIBUTE_SET},
-    Number,
+    AtomicTracker, Number,
 };
 
 /// The storage for sums.
 #[derive(Default)]
 struct ValueMap<T: Number<T>> {
     values: Mutex<HashMap<AttributeSet, T>>,
+    bound_values: Mutex<HashMap<AttributeSet, Arc<dyn AtomicTracker<T> + Send + Sync + 'static>>>,
 }
 
 impl<T: Number<T>> ValueMap<T> {
     fn new() -> Self {
         ValueMap {
             values: Mutex::new(HashMap::new()),
+            bound_values: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -51,6 +53,18 @@ impl<T: Number<T>> ValueMap<T> {
                 }
             }
         }
+    }
+
+    fn get_atomic_tracker(&self, attrs: AttributeSet) -> Arc<dyn AtomicTracker<T>> {
+        let mut values = self
+            .bound_values
+            .lock()
+            .expect("Sum atomic tracker mutex is poisoned");
+        let entry = values
+            .entry(attrs)
+            .or_insert_with(|| Arc::new(T::new_atomic_tracker()));
+
+        entry.clone()
     }
 }
 
@@ -335,9 +349,9 @@ pub(crate) fn generate_bound_measure_sum<T: Number<T>>(
     sum: &Arc<Sum<T>>,
     attrs: AttributeSet,
 ) -> Arc<dyn BoundedMeasure<T>> {
-    let cloned_self = sum.clone();
+    let tracker = sum.value_map.get_atomic_tracker(attrs);
     Arc::new(move |measurement: T| {
-        cloned_self.measure(measurement, attrs.clone());
+        tracker.add(measurement);
     })
 }
 
@@ -345,8 +359,8 @@ pub(crate) fn generate_bound_measure_precomputed_sum<T: Number<T>>(
     precomputed_sum: &Arc<PrecomputedSum<T>>,
     attrs: AttributeSet,
 ) -> Arc<dyn BoundedMeasure<T>> {
-    let cloned_self = precomputed_sum.clone();
+    let tracker = precomputed_sum.value_map.get_atomic_tracker(attrs);
     Arc::new(move |measurement: T| {
-        cloned_self.measure(measurement, attrs.clone());
+        tracker.add(measurement);
     })
 }

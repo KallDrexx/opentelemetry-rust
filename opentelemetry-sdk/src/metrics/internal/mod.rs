@@ -18,6 +18,7 @@ pub(crate) use exponential_histogram::{EXPO_MAX_SCALE, EXPO_MIN_SCALE};
 pub(crate) trait AtomicTracker<T>: Sync + Send + 'static {
     fn add(&self, value: T);
     fn get_and_reset_value(&self) -> T;
+    fn get_value(&self) -> T;
 }
 
 pub(crate) trait AtomicallyUpdate<T> {
@@ -108,6 +109,10 @@ impl AtomicTracker<u64> for U64AtomicTracker {
     fn get_and_reset_value(&self) -> u64 {
         self.atomic.swap(0, Ordering::Relaxed)
     }
+
+    fn get_value(&self) -> u64 {
+        self.atomic.load(Ordering::Relaxed)
+    }
 }
 
 impl AtomicallyUpdate<u64> for u64 {
@@ -137,6 +142,10 @@ impl AtomicTracker<i64> for I64AtomicTracker {
 
     fn get_and_reset_value(&self) -> i64 {
         self.atomic.swap(0, Ordering::Relaxed)
+    }
+
+    fn get_value(&self) -> i64 {
+        self.atomic.load(Ordering::Relaxed)
     }
 }
 
@@ -172,6 +181,11 @@ impl AtomicTracker<f64> for F64AtomicTracker {
         *guard = 0.0;
 
         value
+    }
+
+    fn get_value(&self) -> f64 {
+        let guard = self.inner.lock().expect("F64 mutex was poisoned");
+        *guard
     }
 }
 

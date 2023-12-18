@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::{
     collections::{hash_map::Entry, HashMap},
@@ -119,7 +120,13 @@ impl<T: Number<T>> Sum<T> {
             Err(_) => return (0, None),
         };
 
-        let n = values.len();
+        let mut bound_values = match self.value_map.bound_values.lock() {
+            Ok(v) => v,
+            Err(_) => return (0, None),
+        };
+
+        let n = values.len() + bound_values.len();
+        let mut processed_attr_sets = HashSet::with_capacity(values.len());
         if n > s_data.data_points.capacity() {
             s_data
                 .data_points
@@ -128,13 +135,40 @@ impl<T: Number<T>> Sum<T> {
 
         let prev_start = self.start.lock().map(|start| *start).unwrap_or(t);
         for (attrs, value) in values.drain() {
-            s_data.data_points.push(DataPoint {
-                attributes: attrs,
+            let mut data_point = DataPoint {
+                attributes: attrs.clone(),
                 start_time: Some(prev_start),
                 time: Some(t),
                 value,
                 exemplars: vec![],
-            });
+            };
+
+            if let Some(bound_value) = bound_values.get(&attrs) {
+                let value = bound_value.get_and_reset_value();
+                data_point.value += value;
+            }
+
+            s_data.data_points.push(data_point);
+            processed_attr_sets.insert(attrs);
+        }
+
+        // Add data points for any bound attribute sets that aren't in the unbound value map
+        let mut bound_values_to_keep = HashMap::with_capacity(bound_values.len());
+        for (attrs, value) in bound_values.drain() {
+            if !processed_attr_sets.contains(&attrs) {
+                s_data.data_points.push(DataPoint {
+                    attributes: attrs.clone(),
+                    start_time: Some(prev_start),
+                    time: Some(t),
+                    value: value.get_and_reset_value(),
+                    exemplars: vec![],
+                });
+            }
+
+            if Arc::strong_count(&value) > 1 {
+                // There are still bound instruments using this tracker, so we need to keep it
+                bound_values_to_keep.insert(attrs, value);
+            }
         }
 
         // The delta collection cycle resets.
@@ -171,26 +205,59 @@ impl<T: Number<T>> Sum<T> {
             Err(_) => return (0, None),
         };
 
-        let n = values.len();
+        let mut bound_values = match self.value_map.bound_values.lock() {
+            Ok(v) => v,
+            Err(_) => return (0, None),
+        };
+
+        let n = values.len() + bound_values.len();
         if n > s_data.data_points.capacity() {
             s_data
                 .data_points
                 .reserve_exact(n - s_data.data_points.capacity());
         }
 
+        let mut processed_attr_sets = HashSet::with_capacity(values.len());
         let prev_start = self.start.lock().map(|start| *start).unwrap_or(t);
         // TODO: This will use an unbounded amount of memory if there
         // are unbounded number of attribute sets being aggregated. Attribute
         // sets that become "stale" need to be forgotten so this will not
         // overload the system.
         for (attrs, value) in values.iter() {
-            s_data.data_points.push(DataPoint {
+            let mut data_point = DataPoint {
                 attributes: attrs.clone(),
                 start_time: Some(prev_start),
                 time: Some(t),
                 value: *value,
                 exemplars: vec![],
-            });
+            };
+
+            if let Some(bound_value) = bound_values.get(attrs) {
+                let value = bound_value.get_value();
+                data_point.value += value;
+            }
+
+            s_data.data_points.push(data_point);
+            processed_attr_sets.insert(attrs);
+        }
+
+        // Add data points for any bound attribute sets that aren't in the unbound value map
+        let mut bound_values_to_keep = HashMap::with_capacity(bound_values.len());
+        for (attrs, value) in bound_values.drain() {
+            if !processed_attr_sets.contains(&attrs) {
+                s_data.data_points.push(DataPoint {
+                    attributes: attrs.clone(),
+                    start_time: Some(prev_start),
+                    time: Some(t),
+                    value: value.get_value(),
+                    exemplars: vec![],
+                });
+            }
+
+            if Arc::strong_count(&value) > 1 {
+                // There are still bound instruments using this tracker, so we need to keep it
+                bound_values_to_keep.insert(attrs, value);
+            }
         }
 
         (n, new_agg.map(|a| Box::new(a) as Box<_>))

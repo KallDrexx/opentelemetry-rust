@@ -602,7 +602,7 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-    async fn bounded_counter_value_counted_without_non_bounded_counter_add_call() {
+    async fn bounded_counter_value_counted_without_non_bounded_counter_add_call_cumulative() {
         let mut test_context = TestContext::new(None);
         let counter = test_context.u64_counter("test", "my_counter", "my_unit");
         let bounded_counter = counter.bind(&[KeyValue::new("key1", "value1")]);
@@ -614,12 +614,39 @@ mod tests {
 
         // Expecting 1 time-series.
         assert_eq!(sum.data_points.len(), 1);
-        assert!(sum.is_monotonic, "Counter should produce monotonic.");
+
+        // find and validate key1=value1 datapoint
+        let data_point = sum
+            .data_points
+            .iter()
+            .filter(|dp| {
+                dp.attributes
+                    .iter()
+                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+            })
+            .next();
+
         assert_eq!(
-            sum.temporality,
-            Temporality::Cumulative,
-            "Should produce cumulative by default."
+            data_point
+                .expect("datapoint with key1=value1 expected")
+                .value,
+            5
         );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn bounded_counter_value_counted_without_non_bounded_counter_add_call_delta() {
+        let mut test_context = TestContext::new(Some(Temporality::Delta));
+        let counter = test_context.u64_counter("test", "my_counter", "my_unit");
+        let bounded_counter = counter.bind(&[KeyValue::new("key1", "value1")]);
+
+        bounded_counter.add(5);
+        test_context.flush_metrics();
+
+        let sum = test_context.get_aggregation::<data::Sum<u64>>("my_counter", "my_unit");
+
+        // Expecting 1 time-series.
+        assert_eq!(sum.data_points.len(), 1);
 
         // find and validate key1=value1 datapoint
         let data_point = sum

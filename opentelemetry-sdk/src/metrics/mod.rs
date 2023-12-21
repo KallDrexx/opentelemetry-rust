@@ -707,6 +707,41 @@ mod tests {
         );
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn bounded_value_should_be_exported_on_second_export_even_when_parent_counter_never_used() {
+        // This test ensures that the the bounded atomic is not prematurely removed from the aggregation
+        let mut test_context = TestContext::new(Some(Temporality::Cumulative));
+        let counter = test_context.u64_counter("test", "my_counter", "my_unit");
+        let bounded_counter = counter.bind(&[KeyValue::new("key1", "value1")]);
+
+        bounded_counter.add(5);
+        test_context.flush_metrics();
+        test_context.flush_metrics();
+
+        let sum = test_context.get_aggregation::<data::Sum<u64>>("my_counter", "my_unit");
+
+        // Expecting 1 time-series.
+        assert_eq!(sum.data_points.len(), 1);
+
+        // find and validate key1=value1 datapoint
+        let data_point = sum
+            .data_points
+            .iter()
+            .filter(|dp| {
+                dp.attributes
+                    .iter()
+                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+            })
+            .next();
+
+        assert_eq!(
+            data_point
+                .expect("datapoint with key1=value1 expected")
+                .value,
+            5
+        );
+    }
+
     struct TestContext {
         exporter: InMemoryMetricsExporter,
         meter_provider: SdkMeterProvider,
@@ -778,6 +813,8 @@ mod tests {
                 .get_finished_metrics()
                 .expect("metrics expected to be exported");
             assert!(!self.resource_metrics.is_empty());
+            assert!(!self.resource_metrics[0].scope_metrics.is_empty());
+            assert!(!self.resource_metrics[0].scope_metrics[0].metrics.is_empty());
 
             let metric = &self.resource_metrics[0].scope_metrics[0].metrics[0];
             assert_eq!(metric.name, counter_name);

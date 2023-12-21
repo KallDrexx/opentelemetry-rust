@@ -233,6 +233,8 @@ impl<T: Number<T>> Sum<T> {
             };
 
             if let Some(bound_value) = bound_values.get(attrs) {
+                // TODO: For cumulative counts we need to add them to the original unbounded values
+                // to persist them after the bounded values go away
                 let value = bound_value.get_value();
                 data_point.value += value;
             }
@@ -258,6 +260,10 @@ impl<T: Number<T>> Sum<T> {
                 // There are still bound instruments using this tracker, so we need to keep it
                 bound_values_to_keep.insert(attrs, value);
             }
+        }
+
+        for (attr, values) in bound_values_to_keep {
+            bound_values.insert(attr, values);
         }
 
         (n, new_agg.map(|a| Box::new(a) as Box<_>))

@@ -171,6 +171,10 @@ impl<T: Number<T>> Sum<T> {
             }
         }
 
+        for (attr, values) in bound_values_to_keep {
+            bound_values.insert(attr, values);
+        }
+
         // The delta collection cycle resets.
         if let Ok(mut start) = self.start.lock() {
             *start = t;

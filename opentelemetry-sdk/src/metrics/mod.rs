@@ -116,7 +116,11 @@ mod tests {
             .expect("Sum aggregation expected for Counter instruments by default");
 
         // Expecting 2 time-series.
-        assert_eq!(sum.data_points.len(), 2);
+        assert_eq!(
+            sum.data_points.len(),
+            2,
+            "Incorrect number of data points found"
+        );
         assert!(sum.is_monotonic, "Counter should produce monotonic.");
         assert_eq!(
             sum.temporality,
@@ -708,14 +712,53 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-    async fn bounded_value_should_be_exported_on_second_export_even_when_parent_counter_never_used() {
-        // This test ensures that the the bounded atomic is not prematurely removed from the aggregation
+    async fn bounded_cumulative_counter_add_counted_after_first_export() {
         let mut test_context = TestContext::new(Some(Temporality::Cumulative));
         let counter = test_context.u64_counter("test", "my_counter", "my_unit");
         let bounded_counter = counter.bind(&[KeyValue::new("key1", "value1")]);
 
         bounded_counter.add(5);
         test_context.flush_metrics();
+        let _ = test_context.get_aggregation::<data::Sum<u64>>("my_counter", "my_unit");
+
+        bounded_counter.add(3);
+        test_context.flush_metrics();
+        let sum = test_context.get_aggregation::<data::Sum<u64>>("my_counter", "my_unit");
+        dbg!(sum);
+
+        // Expecting 1 time-series.
+        assert_eq!(sum.data_points.len(), 1);
+
+        // find and validate key1=value1 datapoint
+        let data_point = sum
+            .data_points
+            .iter()
+            .filter(|dp| {
+                dp.attributes
+                    .iter()
+                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+            })
+            .next();
+
+        assert_eq!(
+            data_point
+                .expect("datapoint with key1=value1 expected")
+                .value,
+            8
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn bounded_delta_counter_add_counted_after_first_export() {
+        let mut test_context = TestContext::new(Some(Temporality::Delta));
+        let counter = test_context.u64_counter("test", "my_counter", "my_unit");
+        let bounded_counter = counter.bind(&[KeyValue::new("key1", "value1")]);
+
+        bounded_counter.add(5);
+        test_context.flush_metrics();
+        let _ = test_context.get_aggregation::<data::Sum<u64>>("my_counter", "my_unit");
+
+        bounded_counter.add(3);
         test_context.flush_metrics();
 
         let sum = test_context.get_aggregation::<data::Sum<u64>>("my_counter", "my_unit");
@@ -738,13 +781,15 @@ mod tests {
             data_point
                 .expect("datapoint with key1=value1 expected")
                 .value,
-            5
+            3
         );
     }
 
     struct TestContext {
         exporter: InMemoryMetricsExporter,
         meter_provider: SdkMeterProvider,
+
+        // Saving this on the test context for lifetime simplicity
         resource_metrics: Vec<ResourceMetrics>,
     }
 
@@ -812,11 +857,22 @@ mod tests {
                 .exporter
                 .get_finished_metrics()
                 .expect("metrics expected to be exported");
-            assert!(!self.resource_metrics.is_empty());
-            assert!(!self.resource_metrics[0].scope_metrics.is_empty());
-            assert!(!self.resource_metrics[0].scope_metrics[0].metrics.is_empty());
 
-            let metric = &self.resource_metrics[0].scope_metrics[0].metrics[0];
+            assert!(
+                !self.resource_metrics.is_empty(),
+                "no metrics were exported"
+            );
+
+            // Get the latest resource metric in case of multiple flushes/exports
+            let resource_metric = self.resource_metrics.last().unwrap();
+
+            assert!(
+                !resource_metric.scope_metrics.is_empty(),
+                "No scope metrics in latest export"
+            );
+            assert!(!resource_metric.scope_metrics[0].metrics.is_empty());
+
+            let metric = &resource_metric.scope_metrics[0].metrics[0];
             assert_eq!(metric.name, counter_name);
             assert_eq!(metric.unit.as_str(), unit_name);
 

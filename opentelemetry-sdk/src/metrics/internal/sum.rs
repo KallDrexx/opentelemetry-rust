@@ -436,8 +436,8 @@ pub(crate) fn generate_bound_measure_precomputed_sum<T: Number<T>>(
     precomputed_sum: &Arc<PrecomputedSum<T>>,
     attrs: AttributeSet,
 ) -> Arc<dyn BoundedMeasure<T>> {
-    let tracker = precomputed_sum.value_map.get_atomic_tracker(attrs);
+    let cloned_self = precomputed_sum.clone();
     Arc::new(move |measurement: T| {
-        tracker.add(measurement);
+        cloned_self.measure(measurement, attrs.clone());
     })
 }

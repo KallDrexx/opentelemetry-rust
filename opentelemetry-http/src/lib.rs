@@ -57,53 +57,6 @@ pub trait HttpClient: Debug + Send + Sync {
     async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError>;
 }
 
-#[cfg(feature = "reqwest")]
-mod reqwest {
-    use super::{async_trait, Bytes, HttpClient, HttpError, Request, Response};
-    use std::convert::TryInto;
-    use http::{HeaderMap, HeaderValue};
-
-    #[async_trait]
-    impl HttpClient for reqwest::Client {
-        async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError> {
-            let request = reqwest::RequestBuilder
-
-            let request = request.try_into()?;
-            let mut response = self.execute(request).await?;
-            let headers = std::mem::take(response.headers_mut());
-            let mut http_response = Response::builder()
-                .status(response.status())
-                .body(response.bytes().await?)?;
-
-            let http_crate_headers = http_response.headers_mut();
-            for header in headers {
-                http_crate_headers.append(header.0, HeaderValue::from_str(header.1.to_str()?)?);
-            }
-
-            Ok(http_response)
-        }
-    }
-
-    #[async_trait]
-    impl HttpClient for reqwest::blocking::Client {
-        async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError> {
-            let request = request.try_into()?;
-            let mut response = self.execute(request)?;
-            let headers = std::mem::take(response.headers_mut());
-            let mut http_response = Response::builder()
-                .status(response.status())
-                .body(response.bytes()?)?;
-
-            let http_crate_headers = http_response.headers_mut();
-            for header in headers {
-                http_crate_headers.append(header.0, HeaderValue::from_str(header.1.to_str()?)?);
-            }
-
-            Ok(http_response)
-        }
-    }
-}
-
 #[cfg(feature = "surf")]
 pub mod surf {
     use std::str::FromStr;
@@ -157,30 +110,6 @@ pub mod surf {
                 .status(response.status() as u16)
                 .body(response.body_bytes().await?.into())?;
 
-            *http_response.headers_mut() = headers;
-
-            Ok(http_response)
-        }
-    }
-}
-
-#[cfg(feature = "isahc")]
-mod isahc {
-    use super::{async_trait, Bytes, HttpClient, HttpError, Request, Response};
-    use isahc::AsyncReadResponseExt;
-    use std::convert::TryInto as _;
-
-    #[async_trait]
-    impl HttpClient for isahc::HttpClient {
-        async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError> {
-            let mut response = self.send_async(request).await?;
-            let mut bytes = Vec::with_capacity(response.body().len().unwrap_or(0).try_into()?);
-            response.copy_to(&mut bytes).await?;
-
-            let headers = std::mem::take(response.headers_mut());
-            let mut http_response = Response::builder()
-                .status(response.status().as_u16())
-                .body(bytes.into())?;
             *http_response.headers_mut() = headers;
 
             Ok(http_response)
@@ -247,6 +176,7 @@ pub mod hyper {
             }
             let mut response = time::timeout(self.timeout, self.inner.request(request)).await??;
             let headers = std::mem::take(response.headers_mut());
+            let status = response.status();
 
             let body_bytes = response
                 .into_body()
@@ -255,7 +185,7 @@ pub mod hyper {
                 .to_bytes();
 
             let mut http_response = Response::builder()
-                .status(response.status())
+                .status(status)
                 .body(body_bytes)?;
 
             *http_response.headers_mut() = headers;

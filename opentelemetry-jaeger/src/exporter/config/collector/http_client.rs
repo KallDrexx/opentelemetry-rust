@@ -1,5 +1,6 @@
 use opentelemetry_http::HttpClient;
 use std::time::Duration;
+use bytes::Bytes;
 
 #[derive(Debug)]
 pub(crate) enum CollectorHttpClient {
@@ -103,37 +104,17 @@ impl CollectorHttpClient {
                 })?;
                 Ok(Box::new(client))
             }
-            #[cfg(feature = "reqwest_collector_client")]
-            CollectorHttpClient::Reqwest => {
-                use headers::authorization::Credentials;
-
-                let mut builder = reqwest::ClientBuilder::new().timeout(collector_timeout);
-                if let (Some(username), Some(password)) = (collector_username, collector_password) {
-                    let mut map = http::HeaderMap::with_capacity(1);
-                    let auth_header_val =
-                        headers::Authorization::basic(username.as_str(), password.as_str());
-                    map.insert(http::header::AUTHORIZATION, auth_header_val.0.encode());
-                    builder = builder.default_headers(map);
-                }
-                let client = builder.build().map_err::<crate::Error, _>(|err| {
-                    crate::Error::ConfigError {
-                        pipeline_name: "http_client",
-                        config_name: "collector",
-                        reason: format!("cannot create reqwest http client, {}", err),
-                    }
-                })?;
-                Ok(Box::new(client))
-            }
             #[cfg(any(feature = "hyper_collector_client", feature = "hyper_tls_collector_client"))]
             CollectorHttpClient::Hyper => {
                 use headers::authorization::Credentials;
                 use opentelemetry_http::hyper::HyperClient;
-                use hyper::{Client, Body};
+                use hyper_util::client::legacy::Client;
+                use http_body_util::Full;
 
                 #[cfg(feature = "hyper_tls_collector_client")]
-                let inner: Client<_, Body> = Client::builder().build(hyper_tls::HttpsConnector::new());
+                let inner: Client<_, Full<Bytes>> = Client::builder().build(hyper_tls::HttpsConnector::new());
                 #[cfg(feature = "hyper_collector_client")]
-                let inner: Client<_, Body> = Client::new();
+                let inner: Client<_, Full<Bytes>> = Client::new();
 
                 let client = if let (Some(username), Some(password)) =
                     (collector_username, collector_password)

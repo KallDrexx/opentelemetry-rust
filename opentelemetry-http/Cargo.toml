@@ -13,7 +13,9 @@ rust-version = "1.65"
 async-trait = { workspace = true }
 bytes = { workspace = true }
 http = { workspace = true }
-hyper = { workspace = true, default-features = false, features = ["http2", "client", "tcp"], optional = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true, default-features = false, features = ["http2", "client"], optional = true }
+hyper-util = { workspace = true, features = ["client", "client-legacy", "http2"] }
 isahc = { workspace = true, default-features = false, optional = true }
 opentelemetry = { version = "0.21", path = "../opentelemetry", features = ["trace"] }
 reqwest = { workspace = true, default-features = false, features = ["blocking"], optional = true }

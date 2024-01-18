@@ -61,17 +61,24 @@ pub trait HttpClient: Debug + Send + Sync {
 mod reqwest {
     use super::{async_trait, Bytes, HttpClient, HttpError, Request, Response};
     use std::convert::TryInto;
+    use http::{HeaderMap, HeaderValue};
 
     #[async_trait]
     impl HttpClient for reqwest::Client {
         async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError> {
+            let request = reqwest::RequestBuilder
+
             let request = request.try_into()?;
             let mut response = self.execute(request).await?;
             let headers = std::mem::take(response.headers_mut());
             let mut http_response = Response::builder()
                 .status(response.status())
                 .body(response.bytes().await?)?;
-            *http_response.headers_mut() = headers;
+
+            let http_crate_headers = http_response.headers_mut();
+            for header in headers {
+                http_crate_headers.append(header.0, HeaderValue::from_str(header.1.to_str()?)?);
+            }
 
             Ok(http_response)
         }
@@ -86,7 +93,11 @@ mod reqwest {
             let mut http_response = Response::builder()
                 .status(response.status())
                 .body(response.bytes()?)?;
-            *http_response.headers_mut() = headers;
+
+            let http_crate_headers = http_response.headers_mut();
+            for header in headers {
+                http_crate_headers.append(header.0, HeaderValue::from_str(header.1.to_str()?)?);
+            }
 
             Ok(http_response)
         }
@@ -179,23 +190,25 @@ mod isahc {
 
 #[cfg(any(feature = "hyper", feature = "hyper_tls"))]
 pub mod hyper {
+    use std::error::Error;
     use super::{async_trait, Bytes, HttpClient, HttpError, Request, Response};
     use http::HeaderValue;
-    use hyper::client::connect::Connect;
-    use hyper::Client;
+    use hyper_util::client::legacy::{Client, connect::Connect};
     use std::fmt::Debug;
     use std::time::Duration;
+    use http_body_util::BodyExt;
     use tokio::time;
+    use hyper::body::Body;
 
     #[derive(Debug, Clone)]
-    pub struct HyperClient<C> {
-        inner: Client<C>,
+    pub struct HyperClient<C, B> {
+        inner: Client<C, B>,
         timeout: Duration,
         authorization: Option<HeaderValue>,
     }
 
-    impl<C> HyperClient<C> {
-        pub fn new_with_timeout(inner: Client<C>, timeout: Duration) -> Self {
+    impl<C, B> HyperClient<C, B> {
+        pub fn new_with_timeout(inner: Client<C, B>, timeout: Duration) -> Self {
             Self {
                 inner,
                 timeout,
@@ -204,7 +217,7 @@ pub mod hyper {
         }
 
         pub fn new_with_timeout_and_authorization_header(
-            inner: Client<C>,
+            inner: Client<C, B>,
             timeout: Duration,
             authorization: HeaderValue,
         ) -> Self {
@@ -217,9 +230,12 @@ pub mod hyper {
     }
 
     #[async_trait]
-    impl<C> HttpClient for HyperClient<C>
+    impl<C, B> HttpClient for HyperClient<C, B>
     where
         C: Connect + Send + Sync + Clone + Debug + 'static,
+        B: Body + Send + 'static + Unpin + Debug + std::convert::From<std::vec::Vec<u8>>,
+        B::Data: Send,
+        B::Error: Into<Box<dyn Error + Send + Sync>>,
     {
         async fn send(&self, request: Request<Vec<u8>>) -> Result<Response<Bytes>, HttpError> {
             let (parts, body) = request.into_parts();
@@ -231,9 +247,17 @@ pub mod hyper {
             }
             let mut response = time::timeout(self.timeout, self.inner.request(request)).await??;
             let headers = std::mem::take(response.headers_mut());
+
+            let body_bytes = response
+                .into_body()
+                .collect()
+                .await?
+                .to_bytes();
+
             let mut http_response = Response::builder()
                 .status(response.status())
-                .body(hyper::body::to_bytes(response.into_body()).await?)?;
+                .body(body_bytes)?;
+
             *http_response.headers_mut() = headers;
 
             Ok(http_response)

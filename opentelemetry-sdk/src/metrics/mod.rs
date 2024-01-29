@@ -463,15 +463,11 @@ mod tests {
         );
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -507,15 +503,11 @@ mod tests {
         );
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -547,15 +539,11 @@ mod tests {
         assert_eq!(sum.temporality, Temporality::Delta);
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -587,15 +575,11 @@ mod tests {
         assert_eq!(sum.temporality, Temporality::Delta);
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -620,15 +604,11 @@ mod tests {
         assert_eq!(sum.data_points.len(), 1);
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -653,15 +633,11 @@ mod tests {
         assert_eq!(sum.data_points.len(), 1);
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -693,15 +669,11 @@ mod tests {
         );
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -730,15 +702,11 @@ mod tests {
         assert_eq!(sum.data_points.len(), 1);
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point
@@ -767,15 +735,11 @@ mod tests {
         assert_eq!(sum.data_points.len(), 1);
 
         // find and validate key1=value1 datapoint
-        let data_point = sum
-            .data_points
-            .iter()
-            .filter(|dp| {
-                dp.attributes
-                    .iter()
-                    .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
-            })
-            .next();
+        let data_point = sum.data_points.iter().find(|dp| {
+            dp.attributes
+                .iter()
+                .any(|(k, v)| k.as_str() == "key1" && v.as_str() == "value1")
+        });
 
         assert_eq!(
             data_point

@@ -38,30 +38,32 @@ impl<T: Number<T>> ValueMap<T> {
 }
 
 impl<T: Number<T>> ValueMap<T> {
-    fn measure(&self, measurement: T, attrs: AttributeSet) {
-        if attrs.is_empty() {
-            self.no_attribute_value.add(measurement);
-            self.has_no_value_attribute_value
-                .store(true, Ordering::Release);
-        } else if let Ok(mut values) = self.values.lock() {
-            let size = values.len();
-            match values.entry(attrs) {
-                Entry::Occupied(mut occupied_entry) => {
-                    let sum = occupied_entry.get_mut();
-                    *sum += measurement;
-                }
-                Entry::Vacant(vacant_entry) => {
-                    if is_under_cardinality_limit(size) {
-                        vacant_entry.insert(measurement);
-                    } else {
-                        values
-                            .entry(STREAM_OVERFLOW_ATTRIBUTE_SET.clone())
-                            .and_modify(|val| *val += measurement)
-                            .or_insert(measurement);
-                        global::handle_error(MetricsError::Other("Warning: Maximum data points for metric stream exceeded. Entry added to overflow.".into()));
+    fn measure(&self, measurement: T, attrs: Option<AttributeSet>) {
+        if let Some(attrs) = attrs {
+            if let Ok(mut values) = self.values.lock() {
+                let size = values.len();
+                match values.entry(attrs) {
+                    Entry::Occupied(mut occupied_entry) => {
+                        let sum = occupied_entry.get_mut();
+                        *sum += measurement;
+                    }
+                    Entry::Vacant(vacant_entry) => {
+                        if is_under_cardinality_limit(size) {
+                            vacant_entry.insert(measurement);
+                        } else {
+                            values
+                                .entry(STREAM_OVERFLOW_ATTRIBUTE_SET.clone())
+                                .and_modify(|val| *val += measurement)
+                                .or_insert(measurement);
+                            global::handle_error(MetricsError::Other("Warning: Maximum data points for metric stream exceeded. Entry added to overflow.".into()));
+                        }
                     }
                 }
             }
+        } else {
+            self.no_attribute_value.add(measurement);
+            self.has_no_value_attribute_value
+                .store(true, Ordering::Release);
         }
     }
 }
@@ -87,7 +89,7 @@ impl<T: Number<T>> Sum<T> {
         }
     }
 
-    pub(crate) fn measure(&self, measurement: T, attrs: AttributeSet) {
+    pub(crate) fn measure(&self, measurement: T, attrs: Option<AttributeSet>) {
         self.value_map.measure(measurement, attrs)
     }
 
@@ -248,7 +250,7 @@ impl<T: Number<T>> PrecomputedSum<T> {
         }
     }
 
-    pub(crate) fn measure(&self, measurement: T, attrs: AttributeSet) {
+    pub(crate) fn measure(&self, measurement: T, attrs: Option<AttributeSet>) {
         self.value_map.measure(measurement, attrs)
     }
 

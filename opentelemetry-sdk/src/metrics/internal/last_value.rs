@@ -29,7 +29,8 @@ impl<T: Number<T>> LastValue<T> {
         Self::default()
     }
 
-    pub(crate) fn measure(&self, measurement: T, attrs: AttributeSet) {
+    pub(crate) fn measure(&self, measurement: T, attrs: Option<AttributeSet>) {
+        let attrs = attrs.unwrap_or_default();
         let d: DataPointValue<T> = DataPointValue {
             timestamp: SystemTime::now(),
             value: measurement,

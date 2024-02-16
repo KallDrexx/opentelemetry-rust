@@ -261,7 +261,12 @@ pub(crate) struct ResolvedMeasures<T> {
 impl<T: Copy + 'static> SyncCounter<T> for ResolvedMeasures<T> {
     fn add(&self, val: T, attrs: &[KeyValue]) {
         for measure in &self.measures {
-            measure.call(val, AttributeSet::from(attrs))
+            let attributes = if attrs.is_empty() {
+                None
+            } else {
+                Some(AttributeSet::from(attrs))
+            };
+            measure.call(val, attributes);
         }
     }
 }
@@ -269,7 +274,12 @@ impl<T: Copy + 'static> SyncCounter<T> for ResolvedMeasures<T> {
 impl<T: Copy + 'static> SyncUpDownCounter<T> for ResolvedMeasures<T> {
     fn add(&self, val: T, attrs: &[KeyValue]) {
         for measure in &self.measures {
-            measure.call(val, AttributeSet::from(attrs))
+            let attributes = if attrs.is_empty() {
+                None
+            } else {
+                Some(AttributeSet::from(attrs))
+            };
+            measure.call(val, attributes)
         }
     }
 }
@@ -277,7 +287,12 @@ impl<T: Copy + 'static> SyncUpDownCounter<T> for ResolvedMeasures<T> {
 impl<T: Copy + 'static> SyncGauge<T> for ResolvedMeasures<T> {
     fn record(&self, val: T, attrs: &[KeyValue]) {
         for measure in &self.measures {
-            measure.call(val, AttributeSet::from(attrs))
+            let attributes = if attrs.is_empty() {
+                None
+            } else {
+                Some(AttributeSet::from(attrs))
+            };
+            measure.call(val, attributes)
         }
     }
 }
@@ -285,7 +300,12 @@ impl<T: Copy + 'static> SyncGauge<T> for ResolvedMeasures<T> {
 impl<T: Copy + 'static> SyncHistogram<T> for ResolvedMeasures<T> {
     fn record(&self, val: T, attrs: &[KeyValue]) {
         for measure in &self.measures {
-            measure.call(val, AttributeSet::from(attrs))
+            let attributes = if attrs.is_empty() {
+                None
+            } else {
+                Some(AttributeSet::from(attrs))
+            };
+            measure.call(val, attributes)
         }
     }
 }
@@ -379,7 +399,12 @@ impl<T> Observable<T> {
 impl<T: Copy + Send + Sync + 'static> AsyncInstrument<T> for Observable<T> {
     fn observe(&self, measurement: T, attrs: &[KeyValue]) {
         for measure in &self.measures {
-            measure.call(measurement, AttributeSet::from(attrs))
+            let attributes = if attrs.is_empty() {
+                None
+            } else {
+                Some(AttributeSet::from(attrs))
+            };
+            measure.call(measurement, attributes)
         }
     }
 

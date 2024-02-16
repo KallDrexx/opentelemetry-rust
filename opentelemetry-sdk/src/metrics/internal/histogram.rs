@@ -63,7 +63,9 @@ impl<T: Number<T>> HistValues<T> {
 }
 
 impl<T: Number<T>> HistValues<T> {
-    fn measure(&self, measurement: T, attrs: AttributeSet) {
+    fn measure(&self, measurement: T, attrs: Option<AttributeSet>) {
+        let attrs = attrs.unwrap_or_default();
+
         let f = measurement.into_float();
 
         // This search will return an index in the range `[0, bounds.len()]`, where
@@ -127,7 +129,7 @@ impl<T: Number<T>> Histogram<T> {
         }
     }
 
-    pub(crate) fn measure(&self, measurement: T, attrs: AttributeSet) {
+    pub(crate) fn measure(&self, measurement: T, attrs: Option<AttributeSet>) {
         self.hist_values.measure(measurement, attrs)
     }
 

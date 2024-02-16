@@ -29,14 +29,14 @@ pub(crate) fn is_under_cardinality_limit(size: usize) -> bool {
 
 /// Receives measurements to be aggregated.
 pub(crate) trait Measure<T>: Send + Sync + 'static {
-    fn call(&self, measurement: T, attrs: AttributeSet);
+    fn call(&self, measurement: T, attrs: Option<AttributeSet>);
 }
 
 impl<F, T> Measure<T> for F
 where
-    F: Fn(T, AttributeSet) + Send + Sync + 'static,
+    F: Fn(T, Option<AttributeSet>) + Send + Sync + 'static,
 {
-    fn call(&self, measurement: T, attrs: AttributeSet) {
+    fn call(&self, measurement: T, attrs: Option<AttributeSet>) {
         self(measurement, attrs)
     }
 }
@@ -94,9 +94,11 @@ impl<T: Number<T>> AggregateBuilder<T> {
     /// Wraps the passed in measure with an attribute filtering function.
     fn filter(&self, f: impl Measure<T>) -> impl Measure<T> {
         let filter = self.filter.as_ref().map(Arc::clone);
-        move |n, mut attrs: AttributeSet| {
+        move |n, mut attrs: Option<AttributeSet>| {
             if let Some(filter) = &filter {
-                attrs.retain(filter.as_ref());
+                if let Some(attributes) = &mut attrs {
+                    attributes.retain(filter.as_ref());
+                }
             }
             f.call(n, attrs)
         }
@@ -234,7 +236,7 @@ mod tests {
             }],
         };
         let new_attributes = [KeyValue::new("b", 2)];
-        measure.call(2, AttributeSet::from(&new_attributes[..]));
+        measure.call(2, Some(AttributeSet::from(&new_attributes[..])));
 
         let (count, new_agg) = agg.call(Some(&mut a));
 
@@ -278,7 +280,7 @@ mod tests {
                 is_monotonic: false,
             };
             let new_attributes = [KeyValue::new("b", 2)];
-            measure.call(3, AttributeSet::from(&new_attributes[..]));
+            measure.call(3, Some(AttributeSet::from(&new_attributes[..])));
 
             let (count, new_agg) = agg.call(Some(&mut a));
 
@@ -324,7 +326,7 @@ mod tests {
                 is_monotonic: false,
             };
             let new_attributes = [KeyValue::new("b", 2)];
-            measure.call(3, AttributeSet::from(&new_attributes[..]));
+            measure.call(3, Some(AttributeSet::from(&new_attributes[..])));
 
             let (count, new_agg) = agg.call(Some(&mut a));
 
@@ -366,7 +368,7 @@ mod tests {
                 },
             };
             let new_attributes = [KeyValue::new("b", 2)];
-            measure.call(3, AttributeSet::from(&new_attributes[..]));
+            measure.call(3, Some(AttributeSet::from(&new_attributes[..])));
 
             let (count, new_agg) = agg.call(Some(&mut a));
 
@@ -421,7 +423,7 @@ mod tests {
                 },
             };
             let new_attributes = [KeyValue::new("b", 2)];
-            measure.call(3, AttributeSet::from(&new_attributes[..]));
+            measure.call(3, Some(AttributeSet::from(&new_attributes[..])));
 
             let (count, new_agg) = agg.call(Some(&mut a));
 
